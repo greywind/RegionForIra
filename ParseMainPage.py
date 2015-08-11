@@ -2,35 +2,34 @@
 __author__ = 'brezickiy.sa'
 from grab import Grab
 from lxml.html import fromstring
+from threading import Thread
 from time import sleep
 
-current_letter = 33
-LETTERS_COUNT = current_letter + 1
+letters_to_work_with = [1]
+LETTERS_COUNT = 32
 
-GET_URL_MAX_COUNT = 10;
+def get_info_by_letter(letter):
+    GET_URL_MAX_COUNT = 10
 
+    g = Grab()
+    g.setup(
+        user_agent='Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36')
+    g.setup(connect_timeout=20000, timeout=20000)
 
-g = Grab()
-g.setup(
-    user_agent='Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36')
-
-while current_letter < LETTERS_COUNT:
-    current_letter += 1
     result = {}
-    errors = [];
-
-    print('LETTER: '+str(current_letter)+'/'+str(LETTERS_COUNT))
+    errors = []
 
     tryNumber = 1
     while tryNumber <= GET_URL_MAX_COUNT:
         try:
-            resp = g.go('http://mosopen.ru/streets/letter/' + str(current_letter))
+            print('LETTER: ' + str(letter) + '/' + str(LETTERS_COUNT) + '(' + str(tryNumber) + ')')
+            resp = g.go('http://mosopen.ru/streets/letter/' + str(letter))
             break
         except Exception:
             tryNumber += 1
-    if tryNumber == GET_URL_MAX_COUNT:
-        errors.append('http://mosopen.ru/streets/letter/' + str(current_letter))
-        continue
+    if tryNumber > GET_URL_MAX_COUNT:
+        errors.append('http://mosopen.ru/streets/letter/' + str(letter))
+        return
 
     htmlLetter = fromstring(resp.body)
     streetURLs = [a.get('href') for a in htmlLetter.xpath('//div[@class="double_part"]/descendant::a')]
@@ -39,15 +38,16 @@ while current_letter < LETTERS_COUNT:
 
     for streetURL in streetURLs:
         streetIndex += 1
-        print('STREET: '+str(streetIndex)+'/'+str(streetCount))
         tryNumber = 1
         while tryNumber <= GET_URL_MAX_COUNT:
             try:
+                print('LETTER: ' + str(letter) + '/' + str(LETTERS_COUNT) + ' STREET: ' + str(streetIndex) + '/' + str(
+                    streetCount) + '(' + str(tryNumber) + ')')
                 resp = g.go(streetURL)
                 break
             except Exception:
                 tryNumber += 1
-        if tryNumber == GET_URL_MAX_COUNT:
+        if tryNumber > GET_URL_MAX_COUNT:
             errors.append(streetURL)
             continue
 
@@ -60,15 +60,18 @@ while current_letter < LETTERS_COUNT:
 
         for houseURL in houseURLs:
             houseIndex += 1
-            print('HOUSE: '+str(houseIndex)+'/'+str(houseCount))
             tryNumber = 1
             while tryNumber <= GET_URL_MAX_COUNT:
                 try:
+                    print(
+                        'LETTER: ' + str(letter) + '/' + str(LETTERS_COUNT) + ' STREET: ' + str(streetIndex) + '/' + str(
+                            streetCount) + ' HOUSE: ' + str(houseIndex) + '/' + str(houseCount) + '(' + str(
+                            tryNumber) + ')')
                     resp = g.go(houseURL)
                     break
                 except Exception:
                     tryNumber += 1
-            if tryNumber == GET_URL_MAX_COUNT:
+            if tryNumber > GET_URL_MAX_COUNT:
                 errors.append(houseURL)
                 continue
 
@@ -90,20 +93,25 @@ while current_letter < LETTERS_COUNT:
 
             result[ao][region].add(index)
 
-    resultFile = open('O:\\Cloud@Mail.Ru\\\MoscowStreets'+str(current_letter)+'.csv', 'a')
+    resultFile = open('E:\\output\\MoscowStreets' + str(letter) + '.csv', 'a')
 
     for ao in result:
         for region in result[ao]:
             for index in result[ao][region]:
                 resultFile.write(ao + '\t' + region + '\t' + index + '\n')
 
-    resultFile.write(str(current_letter) + '\t' + str(current_letter) + '\t' + str(current_letter) + '\n')
+    resultFile.write(str(letter) + '\t' + str(letter) + '\t' + str(letter) + '\n')
 
     resultFile.close()
 
-    errorsFile = open('O:\\Cloud@Mail.Ru\\MoscowStreets_ERRORS.csv', 'a')
+    errorsFile = open('E:\\output\\MoscowStreets_ERRORS.csv', 'a')
 
     for e in errors:
-        errorsFile.write(e+'\n')
+        errorsFile.write(e + '\n')
 
     errorsFile.close()
+
+
+for current_letter in letters_to_work_with:
+    Thread(target=get_info_by_letter, args=(current_letter,)).start()
+    sleep(20)
